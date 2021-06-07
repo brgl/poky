@@ -427,10 +427,12 @@ python () {
         # date/time values. It will get expanded at execution time.
         # Similarly TMPDIR since otherwise we see QA stamp comparision problems
         # Expand PV else it can trigger get_srcrev which can fail due to these variables being unset
+        # Delete IMGDEPLOYDIR so that each task gets its own, overriden value
         localdata.setVar('PV', d.getVar('PV'))
         localdata.delVar('DATETIME')
         localdata.delVar('DATE')
         localdata.delVar('TMPDIR')
+        localdata.delVar('IMGDEPLOYDIR')
         vardepsexclude = (d.getVarFlag('IMAGE_CMD_' + realt, 'vardepsexclude', True) or '').split()
         for dep in vardepsexclude:
             localdata.delVar(dep)
@@ -501,6 +503,21 @@ python () {
 
         bb.debug(2, "Adding task %s before %s, after %s" % (task, 'do_image_complete', after))
         bb.build.addtask(task, 'do_image_complete', after, d)
+
+        imgdeploydir = d.getVar('IMGDEPLOYDIR')
+        task_override = task[3:].replace('_', '-') # 'do_image_ext4' becomes 'image-ext4'
+        taskdeploydir = '%s/deploy-%s-%s' % (os.path.dirname(imgdeploydir),
+                                             d.getVar('PN'), task_override)
+
+        # Each image task gets its own IMGDEPLOYDIR directory and is added to
+        # SSTATETASKS. This way every set of artifacts gets deployed right after
+        # the do_image_foo task completes.
+        d.setVar('IMGDEPLOYDIR_task-%s' % task_override, taskdeploydir)
+        d.appendVar('SSTATETASKS', ' %s' % task)
+        d.setVarFlag(task, 'sstate-inputdirs', taskdeploydir)
+        d.setVarFlag(task, 'sstate-outputdirs', d.getVar('DEPLOY_DIR_IMAGE'))
+        d.setVarFlag(task, 'cleandirs', taskdeploydir)
+        d.setVar('SSTATE_SKIP_CREATION_task-%s' % task_override, '1')
 }
 
 #
