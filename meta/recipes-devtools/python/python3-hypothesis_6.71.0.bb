@@ -20,6 +20,7 @@ RDEPENDS:${PN} += " \
     python3-compression \
     python3-core \
     python3-json \
+    python3-pytest \
     python3-sortedcontainers \
     python3-statistics \
     python3-unittest \
